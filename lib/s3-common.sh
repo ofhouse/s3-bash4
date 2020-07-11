@@ -4,7 +4,7 @@
 # (c) 2015 Chi Vinh Le <cvl@winged.kiwi>
 
 # Constants
-readonly VERSION="0.0.1"
+readonly VERSION="0.0.2"
 
 # Exit codes
 readonly INVALID_USAGE_EXIT_CODE=1
@@ -45,7 +45,7 @@ assertArgument() {
 #   $1 string resource path
 ##
 assertResourcePath() {
-  if [[ $1 = !(/*) ]]; then
+  if [[ $1 =~ !(/*) ]]; then
     err "Resource should start with / e.g. /bucket/file.ext"
     exit $INVALID_USAGE_EXIT_CODE
   fi
@@ -118,17 +118,6 @@ processAWSSecretFile() {
 }
 
 ##
-# Convert string to hex with max line size of 256
-# Arguments:
-#   $1 string to convert
-# Returns:
-#   string hex
-##
-hex256() {
-  printf "$1" | od -A n -t x1 | sed ':a;N;$!ba;s/[\n ]//g'
-}
-
-##
 # Calculate sha256 hash
 # Arguments:
 #   $1 string to hash
@@ -161,8 +150,7 @@ sha256HashFile() {
 #   string signature
 ##
 hmac_sha256() {
-  printf "$2" | openssl dgst -binary -hex -sha256 -mac HMAC -macopt hexkey:$1 \
-              | sed 's/^.* //'
+  printf "${2}" | openssl dgst -binary -hex -sha256 -mac HMAC -macopt "${1}" | sed 's/^.* //'
 }
 
 ##
@@ -175,11 +163,17 @@ hmac_sha256() {
 #   $5 string data to sign
 # Returns:
 #   signature
+# Source:
+#   https://gist.github.com/mmaday/c82743b1683ce4d27bfa6615b3ba2332
 ##
 sign() {
-  local kSigning=$(hmac_sha256 $(hmac_sha256 $(hmac_sha256 \
-                 $(hmac_sha256 $(hex256 "AWS4$1") $2) $3) $4) "aws4_request")
-  hmac_sha256 "${kSigning}" "$5"
+  local kSigning=$5
+  local dateKey=$(hmac_sha256 key:"AWS4${1}" "${2}")
+  local regionKey=$(hmac_sha256 hexkey:"${dateKey}" "${3}")
+  local serviceKey=$(hmac_sha256 hexkey:"${regionKey}" "${4}")
+  local signingKey=$(hmac_sha256 hexkey:"${serviceKey}" "aws4_request")
+
+  printf "${kSigning}" | openssl dgst -sha256 -mac HMAC -macopt hexkey:"${signingKey}" | sed 's/(stdin)= //'
 }
 
 ##
@@ -214,9 +208,8 @@ convS3RegionToEndpoint() {
 #   INSECURE              bool
 ##
 performRequest() {
-  local timestamp=$(date -u "+%Y-%m-%d %H:%M:%S")
-  local isoTimestamp=$(date -ud "${timestamp}" "+%Y%m%dT%H%M%SZ")
-  local dateScope=$(date -ud "${timestamp}" "+%Y%m%d")
+  local isoTimestamp=${isoTimestamp-$(date -u +"%Y%m%dT%H%M%SZ")}
+  local dateScope=${dateScope-$(date -u +"%Y%m%d")}
   local host=$(convS3RegionToEndpoint "${AWS_REGION}")
 
   # Generate payload hash

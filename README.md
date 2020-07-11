@@ -1,5 +1,7 @@
 # s3-bash4
 
+> **Note:** Since the [original repo](https://github.com/wikiwi/s3-bash4) seems dead, I created this fork which includes fixes for MacOS.
+
 _s3-bash4_ is a small collection of _Bash_ scripts to do simple interaction with _Amazon S3_ using [_AWS Signature Version 4_](http://docs.aws.amazon.com/AmazonS3/latest/API/sig-v4-authenticating-requests.html). The advantage of using _s3-bash4_ is that it's extremly lightweight and easy to use. No need to setup _Python_, _Java_, _Ruby_ and co.
 
 This is inspired by the discontinued [_s3-bash_](https://github.com/cosmin/s3-bash) from _cosmin_. I was in need of a _Bash_ version that supports the newer _AWS Signature Version 4_.
